@@ -15,6 +15,7 @@ import shutil
 from sqlalchemy import create_engine  
 from sqlalchemy import text  
 from dotenv import load_dotenv 
+import psycopg2
 
 load_dotenv()
 
@@ -142,7 +143,7 @@ def salvar_em_postgresql(df):
     df_renomeado = df.rename(columns=MAPEAMENTO_COLUNAS)
 
     # Seleciona apenas as colunas que existem no banco
-    df_para_inserir = df_renomeado[['grade_id', 'value', 'data', 'type']]
+    df_para_inserir = df_renomeado[['grade_id', 'value', 'date', 'type']]
 
     # Envia os dados para o banco, fazendo append na tabela existente
     df_para_inserir.to_sql(
@@ -187,7 +188,6 @@ def main():
     nc_path = baixar_ultima_imagem()
     geotiff_path = converter_netcdf_para_geotiff(nc_path)
     calcular_estatisticas_zonais(geotiff_path, grid_path)
-    
     limpar_diretorio(RASTER_DIR)
 
 if __name__ == "__main__":
