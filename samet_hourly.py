@@ -171,7 +171,7 @@ def calcular_estatisticas_zonais(raster_path, grid_path):
     df_stats = pd.DataFrame(stats)
     df_result = pd.concat([grid, df_stats], axis=1)
 
-    df_result = df_result.interpolate(method='nearest', axis=0) #preenche valores vazios com vizinho mais próximo
+    df_result = df_result.ffill().bfill()
 
     # Salva apenas 'indice_gre', 'mean', 'date' e 'type' no PostgreSQL
     salvar_em_postgresql(df_result)
