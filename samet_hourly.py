@@ -16,18 +16,28 @@ from sqlalchemy import create_engine
 from sqlalchemy import text  
 from dotenv import load_dotenv 
 import psycopg2
+import os
+from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 load_dotenv()
 
 # URLs e caminhos
 url_base = "https://ftp.cptec.inpe.br/modelos/tempo/SAMeT/HOURLY/2024/"
-grid_path = "D:/dados/vectors/grid/grade_estatistica_wgs.shp"
-RASTER_DIR = "rasters"
+grid_path = f"data/grade_estatistica_wgs.shp"
+RASTER_DIR = f"rasters"
 
-# Configurações do banco de dados PostgreSQL
-DATABASE_URL = os.getenv("DATABASE_URL")  # Carrega a variável do .env
-TABELA = "grids"
-SCHEMA = "indicators"
+
+user = quote_plus(os.getenv("DB_USER"))
+password = quote_plus(os.getenv("DB_PASSWORD"))
+host = os.getenv("DB_HOST")
+port = os.getenv("DB_PORT")
+db_name = os.getenv("DB_NAME")
+SCHEMA = os.getenv("SCHEMA")
+TABELA = os.getenv("TABELA")
+
+# Montar a URL do banco com encoding seguro
+DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{db_name}?client_encoding=utf8"
 
 
 # Criar diretório para salvar rasters, se não existir
@@ -110,14 +120,15 @@ def verificar_alinhamento_crs(raster_path, grid):
     return grid
 
 def testar_conexao(engine):
-    """Verifica se a conexão ao banco foi bem-sucedida."""
     try:
         with engine.connect() as connection:
             result = connection.execute(text("SELECT 1"))
             if result.fetchone()[0] == 1:
                 print("Conexão ao banco de dados bem-sucedida!")
+    except UnicodeDecodeError as e:
+        print(f"Erro de Unicode: {e}")
     except Exception as e:
-        print(f"Erro na conexão ao banco de dados: {e}")
+        print(f"Erro ao conectar: {e}")
 
 def salvar_em_postgresql(df):
     """Salva as colunas mapeadas no PostgreSQL."""
@@ -131,7 +142,7 @@ def salvar_em_postgresql(df):
     df['date'] = datetime.now()
    
     #adiciona o type no banco com valor satmet (avaliar se mantém)
-    df['type'] = 'satmet'
+    df['type'] = 'temperatura_samet'
 
     # Mapeamento entre colunas do DataFrame e as do banco
     MAPEAMENTO_COLUNAS = {
@@ -145,10 +156,12 @@ def salvar_em_postgresql(df):
     # Seleciona apenas as colunas que existem no banco
     df_para_inserir = df_renomeado[['grade_id', 'value', 'date', 'type']]
 
+
     # Envia os dados para o banco, fazendo append na tabela existente
     df_para_inserir.to_sql(
-        TABELA,  # Nome da tabela no banco
-        engine,
+        name=TABELA,  # Nome da tabela no banco
+        con=engine,
+        schema=SCHEMA,
         if_exists='append',  # Faz append se a tabela já existir
         index=False  # Não salva o índice do DataFrame como coluna
     )
@@ -156,7 +169,7 @@ def salvar_em_postgresql(df):
     print(f"Dados salvos na tabela {TABELA} com sucesso.")
 
 def calcular_estatisticas_zonais(raster_path, grid_path):
-    grid = gpd.read_file(grid_path)
+    grid = gpd.read_file(grid_path, encoding='utf-8')
     grid = verificar_alinhamento_crs(raster_path, grid)
 
     with rasterio_open(raster_path) as src:
