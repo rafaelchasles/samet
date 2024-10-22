@@ -21,10 +21,7 @@ url_base = "https://ftp.cptec.inpe.br/modelos/tempo/SAMeT/HOURLY/2024/"
 grid_path = "D:/dados/vectors/grid/grade_estatistica_wgs.shp"
 RASTER_DIR = "rasters"
 
-# Configurações do banco de dados PostgreSQL
-DATABASE_URL = "postgresql://daee:@c3s-s0_d@33@143.107.108.112:5432/sibh_production"
-TABELA = "grids"
-SCHEMA = "indicators"
+
 
 # Criar diretório para salvar rasters, se não existir
 os.makedirs(RASTER_DIR, exist_ok=True)
