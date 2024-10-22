@@ -14,13 +14,19 @@ from affine import Affine
 import shutil
 from sqlalchemy import create_engine  
 from sqlalchemy import text  
+from dotenv import load_dotenv 
 
+load_dotenv()
 
 # URLs e caminhos
 url_base = "https://ftp.cptec.inpe.br/modelos/tempo/SAMeT/HOURLY/2024/"
 grid_path = "D:/dados/vectors/grid/grade_estatistica_wgs.shp"
 RASTER_DIR = "rasters"
 
+# Configurações do banco de dados PostgreSQL
+DATABASE_URL = os.getenv("DATABASE_URL")  # Carrega a variável do .env
+TABELA = "grids"
+SCHEMA = "indicators"
 
 
 # Criar diretório para salvar rasters, se não existir
