@@ -19,14 +19,15 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 from urllib.parse import quote_plus
+from datetime import datetime
+from datetime import datetime, timedelta
 
 load_dotenv()
 
 # URLs e caminhos
 url_base = "https://ftp.cptec.inpe.br/modelos/tempo/SAMeT/HOURLY/2024/"
-grid_path = f"data/grade_estatistica_wgs.shp"
+grid_path = f"data/grid_test.shp"
 RASTER_DIR = f"rasters"
-
 
 user = quote_plus(os.getenv("DB_USER"))
 password = quote_plus(os.getenv("DB_PASSWORD"))
@@ -66,6 +67,8 @@ def baixar_ultima_imagem():
 
     url_arquivo = f"{url_dia}{ultimo_arquivo}"
     caminho_arquivo = os.path.join(RASTER_DIR, ultimo_arquivo)
+    print(ultimo_arquivo)
+
 
     if not os.path.exists(caminho_arquivo):
         print(f"Baixando: {url_arquivo}")
@@ -99,6 +102,8 @@ def converter_netcdf_para_geotiff(nc_path):
     data_array.rio.to_raster(geotiff_path, transform=transform)
     print(f"Arquivo convertido para GeoTIFF: {geotiff_path}")
 
+    
+
     return geotiff_path
 
 def flipud(raster, affine):
@@ -130,19 +135,25 @@ def testar_conexao(engine):
     except Exception as e:
         print(f"Erro ao conectar: {e}")
 
-def salvar_em_postgresql(df):
+def salvar_em_postgresql(df, geotiff_path):
     """Salva as colunas mapeadas no PostgreSQL."""
     # Cria a conexão com o banco de dados
     engine = create_engine(DATABASE_URL)
 
     testar_conexao(engine)
 
+    # Extrai a data do caminho do GeoTIFF
+    data_string = geotiff_path.split('_')[-1].split('.')[0]
+    data_formatada = datetime.strptime(data_string, "%Y%m%d%H")
 
-    # Adiciona uma coluna com a data e hora atuais / verificar se mantemos dessa forma já que existe uma latência!!
-    df['date'] = datetime.now()
-   
-    #adiciona o type no banco com valor satmet (avaliar se mantém)
-    df['type'] = 'temperatura_samet'
+    # Adiciona 3 horas
+    data_formatada += timedelta(hours=3)
+
+    # Atribui ao DataFrame
+    df['date'] = data_formatada
+
+    # Adiciona o tipo no banco com valor 'temperatura_samet'
+    df['type'] = 'temperatura_samet_h'
 
     # Mapeamento entre colunas do DataFrame e as do banco
     MAPEAMENTO_COLUNAS = {
@@ -156,7 +167,6 @@ def salvar_em_postgresql(df):
     # Seleciona apenas as colunas que existem no banco
     df_para_inserir = df_renomeado[['grade_id', 'value', 'date', 'type']]
 
-
     # Envia os dados para o banco, fazendo append na tabela existente
     df_para_inserir.to_sql(
         name=TABELA,  # Nome da tabela no banco
@@ -168,6 +178,7 @@ def salvar_em_postgresql(df):
 
     print(f"Dados salvos na tabela {TABELA} com sucesso.")
 
+# Atualize a chamada da função em calcular_estatisticas_zonais
 def calcular_estatisticas_zonais(raster_path, grid_path):
     grid = gpd.read_file(grid_path, encoding='utf-8')
     grid = verificar_alinhamento_crs(raster_path, grid)
@@ -188,7 +199,8 @@ def calcular_estatisticas_zonais(raster_path, grid_path):
     df_result = df_result.ffill().bfill()
 
     # Salva apenas 'indice_gre', 'mean', 'date' e 'type' no PostgreSQL
-    salvar_em_postgresql(df_result)
+    salvar_em_postgresql(df_result, raster_path)
+
 
 def limpar_diretorio(diretorio):
     try:
